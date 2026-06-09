@@ -197,8 +197,8 @@ class CellProblem:
                 h_u, g_u, h_r, g_r):
         l = len(idx)
 
-        folder = os.path.join("venv-firedrake/homogenization/output", str(l))
-        folder_constants = os.path.join("venv-firedrake/homogenization/output/constants", str(l))
+        folder = os.path.join("output/correctors", str(l))
+        folder_constants = os.path.join("output/constants", str(l))
         os.makedirs(folder, exist_ok=True)
         if l == 0:
             suffix = f"a{a}"
