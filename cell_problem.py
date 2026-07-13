@@ -98,9 +98,9 @@ class CellProblem:
             ])
         
         kron = np.eye(3)
-        ea = [0.0, 0.0, 0.0]
-        ea[a] = 1.0
-        ea = as_vector(Constant(ea))
+        ea_list = [0.0, 0.0, 0.0]
+        ea_list[a] = 1.0
+        ea = as_vector(Constant(ea_list))
         volume = assemble(Constant(1.0)*dx(domain=self.mesh))
 
         u_test, r_test = TestFunctions(self.mixedFEspace)
@@ -120,7 +120,7 @@ class CellProblem:
         g_u = as_vector([-assemble(rhs_ur_trial[i] * dx(domain=self.mesh)) / volume for i in range(3)])
         # Remark: for l==0 --> h_u = g_u = 0;
         #         for l==1 --> h_u = 0, g_u = - mskw e_{k_l}^T
-        #         for l>=2 --> h_u != 0, g_u =? --> impose = 0??
+        #         for l>=2 --> h_u != 0, g_u =? --> for now impose = 0
         if len(idx) >= 2:
             g_u = as_vector(Constant((0.,0.,0.)))
 
@@ -158,8 +158,17 @@ class CellProblem:
         # Remark: for l==0 --> h_r = 0, g_r =? --> impose g_r;
         #         for l==1 --> h_r != 0, g_r = 0
         #         for l>=2 --> h_r != 0, g_r =? --> impose = 0??
+        # print(f"        ea = {ea_list}")
         if len(idx) == 0:
-            g_r = as_vector([-assemble(self.mu * ea[i] * dx(domain=self.mesh)) / volume for i in range(3)])
+            # g_r = as_vector([assemble(1/self.mu * ea[i] * dx(domain=self.mesh)) / volume for i in range(3)])
+            g_r_values = [
+                assemble((1/self.mu) * ea[i] * dx(domain=self.mesh)) / volume
+                for i in range(3)
+            ]
+
+            g_r = as_vector(g_r_values)
+            # print(f"        g_r = [{g_r_values[0]:.8f}, {g_r_values[1]:.8f}, {g_r_values[2]:.8f}]")
+        
         elif len(idx) >= 1:
             g_r = as_vector(Constant((0.,0.,0.)))
 
@@ -176,6 +185,17 @@ class CellProblem:
         u2, r2 = wh2.subfunctions
         du2 = Function(self.gradFEspace).interpolate(grad(u2))
         dmuu2 = Function(self.gradFEspace).interpolate(grad(self.mu*u2))
+
+        sym_grad_mu_u2 = self.mu * sym(grad(u2))
+        avg_mu_sym_grad_u2 = np.zeros((3, 3))
+        for i in range(3):
+            for j in range(3):
+                avg_mu_sym_grad_u2[i, j] = (
+                    assemble(sym_grad_mu_u2[i, j] * dx(domain=self.mesh))
+                    / volume
+                )
+        print("Average(mu sym(grad u2)) =")
+        print(avg_mu_sym_grad_u2)
 
         hu_fun = Function(self.vectorDG0, name="h_u")
         hu_fun.interpolate(h_u)
