@@ -56,7 +56,7 @@ class CellProblem:
                 [-v[1],  v[0],     0]
             ])
 
-        self.a = (self.mu * inner(grad(u), grad(u_test)) + dot(mskew(grad(r)), u_test) + dot(mskew(grad(u)), r_test) + 2 / self.mu * dot(r, r_test))*dx
+        self.a = (self.mu * inner(grad(u), grad(u_test)) + self.mu * dot(mskew(grad(r)), u_test) + dot(mskew(grad(u)), r_test) + 2 * dot(r, r_test))*dx
 
     def _build_solver(self):
         A = assemble(self.a,
