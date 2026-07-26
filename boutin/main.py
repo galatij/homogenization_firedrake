@@ -16,27 +16,30 @@ from check_effective import *
 
 def main():
     # DATA FOR THE LOCAL PROBLEM
-    n = 20
+    n = 50
     data = {
         "R": 5,
         "t": 2.5,
         "l": 25
     }
+    dim = 2
     order = 2
+    load = -5
 
-    mu_fun = lambda x,y,z: conditional(inside_dark(x,y,z, data), Constant(1e8), Constant(1e10))
-    lmbda_fun = lambda x,y,z: conditional(inside_dark(x,y,z, data), Constant(0.0), Constant(0.0))
+    mu_fun = lambda x,y,z: conditional(inside_dark(x,y,z, data), Constant(1e9), Constant(1e7))
+    lmbda_fun = lambda x,y,z: conditional(inside_dark(x,y,z, data), Constant(1e10), Constant(1e8))
     # mu_fun = lambda x,y,z: conditional(y >= 0.5, Constant(0.001), Constant(0.9))
     # lmbda_fun = lambda x,y,z: conditional(y >= 0.5, Constant(0.0), Constant(0.0))
 
     # SOLVE THE LOCAL PERIODIC PROBLEM AND COMPUTE EFFECTIVE COEFFICIENTS
-    cell_pb = CellProblem(n, mu_fun, lmbda_fun)
+    cell_pb = CellProblem(n, mu_fun, lmbda_fun, dim)
     homogenization_pb = HomogenizationProblem(cell_pb, order)
 
     Ceff, tCeff = homogenization_pb.run()
 
     # CHECK EFFECTIVE COEFFICIENTS
     results = check_effective_tensors(
+        dim,
         Ceff[2],
         tCeff[2],
         CST=cell_pb.CST_np,
@@ -44,10 +47,13 @@ def main():
         plot=True
     )
 
-    # SOLVE GLOBAL PROBLEM WITH EFFECTIVE COEFFICIENTS
-    f_fun = lambda x,y,z: as_vector((0., -5., 0.))
-    coarse_mesh = BoxMesh(40,20,1,40,10,1)
-    eff_pb = EffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun)
+    # # SOLVE GLOBAL PROBLEM WITH EFFECTIVE COEFFICIENTS
+    f_vec = np.zeros(dim)
+    f_vec[1] = load
+    f_fun = lambda x,y,z: as_vector(f_vec)
+    
+    coarse_mesh = BoxMesh(40,20,1,40,10,1) if dim==3 else RectangleMesh(80,40,40,10)
+    eff_pb = EffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim)
     eff_pb.solve()
 
 

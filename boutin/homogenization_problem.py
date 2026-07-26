@@ -8,12 +8,11 @@ class HomogenizationProblem:
     def __init__(self, cell_problem, max_order):
         self.cell = cell_problem
         self.max_order = max_order
-        zero_tensor = Function(cell_problem.gradFEspace, name="zero_tensor")
-        zero_tensor.interpolate(as_tensor(((0.,0.,0.),
-                                                (0.,0.,0.),
-                                                (0.,0.,0.))))
 
-        self.store = SolutionStore(cell_problem.cst, cell_problem.CST, zero_tensor)
+        zero_tensor = Function(cell_problem.gradFEspace, name="zero_tensor")
+        zero_tensor.interpolate(as_tensor((np.zeros((cell_problem.dim, cell_problem.dim)))))
+
+        self.store = SolutionStore(cell_problem.cst, cell_problem.CST, zero_tensor, cell_problem.dim)
         self.Ceff = {}
         self.tCeff = {}
         for l in range(2, max_order + 1):
@@ -58,10 +57,10 @@ class HomogenizationProblem:
         if l == 0:
             return [()]
 
-        first_indices = range(3)
+        first_indices = range(self.cell.dim)
 
         derivative_indices = list(
-            combinations_with_replacement(range(3), l - 1)
+            combinations_with_replacement(range(self.cell.dim), l - 1)
         )
 
         return [
@@ -71,7 +70,8 @@ class HomogenizationProblem:
         ]
 
 class SolutionStore:
-    def __init__(self, cst, CST, zero_tensor):
+    def __init__(self, cst, CST, zero_tensor, dim):
+        self.dim = dim
         self.cst = cst
         self.CST = CST
         self.c = {}
@@ -120,7 +120,7 @@ class SolutionStore:
             return self.C[key]
         # elif vec:
         if len(key) == 2:
-            return as_vector(tuple(np.zeros(3)))
+            return as_vector(tuple(np.zeros(self.dim)))
         #elif len >=3:
         prev_key = key[:-1]
         return self.__tensor_column(self.C[prev_key], key[-1])
@@ -131,7 +131,7 @@ class SolutionStore:
             return self.tC[key]
         # elif vec:
         if len(key) == 2:
-            return as_vector(tuple(np.zeros(3)))
+            return as_vector(tuple(np.zeros(self.dim)))
         
         prev_key = key[:-1]
         if len(key) == 3:
@@ -145,16 +145,16 @@ class SolutionStore:
             return self.u[key]
         
         if len(key) == 2:
-            kron = Identity(3)
+            kron = Identity(self.dim)
             return as_vector(tuple(kron[:, key[0]]))
         prev_key = key[:-1]
         return self.u[prev_key]
     
     def __tensor_column(self, A, j):
-        return as_vector([A[i, j] for i in range(3)])
+        return as_vector([A[i, j] for i in range(self.dim)])
     
     def __tensor4_column(self, A, j, k, l):
-        return as_vector([A[i,j,k,l] for i in range(3)])
+        return as_vector([A[i,j,k,l] for i in range(self.dim)])
 
         
     # def _generate_multiindices(self, l):
@@ -162,5 +162,5 @@ class SolutionStore:
     #         return [()]
     #     return [
     #         tuple(idx)
-    #         for idx in combinations_with_replacement(range(3), l)
+    #         for idx in combinations_with_replacement(range(self.cell.dim), l)
     #     ]

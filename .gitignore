@@ -4,3 +4,6 @@ __pycache__/
 *.vtu
 output/
 .vscode/
+boutin/lmbda/
+boutin/mu/
+effective/

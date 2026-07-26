@@ -3,6 +3,7 @@ from firedrake import *
 import matplotlib.pyplot as plt
 
 def check_effective_tensors(
+        dim,
         Ceff0,
         tCeff0,
         CST=None,
@@ -16,10 +17,10 @@ def check_effective_tensors(
     Parameters
     ----------
     Ceff0 : ndarray
-        Effective elasticity tensor C^0_eff, shape (3,3,3,3).
+        Effective elasticity tensor C^0_eff, shape (dim,dim,dim,dim).
 
     tCeff0 : ndarray
-        Effective tilde tensor, shape (3,3,3,3).
+        Effective tilde tensor, shape (dim,dim,dim,dim).
 
     CST : optional
         Reference isotropic tensor. Can be numpy or UFL/Firedrake tensor.
@@ -40,20 +41,16 @@ def check_effective_tensors(
 
     results = {}
 
+    if dim not in (2, 3):
+        raise ValueError(f"Unsupported dimension {dim}")
+    
     # Convert effective tensors
-    Ceff0 = np.asarray(Ceff0)
-    tCeff0 = np.asarray(tCeff0)
+    Ceff0 = _dict_to_tensor4(Ceff0, dim)
+    tCeff0 = _dict_to_tensor4(tCeff0, dim)
 
     # Voigt conversion
-    def tensor_to_voigt(C):
-        pairs = [(0,0),(1,1),(2,2),(1,2),(0,2),(0,1)]
-        V = np.zeros((6,6))
-        for I,(i,j) in enumerate(pairs):
-            for J,(k,l) in enumerate(pairs):
-                V[I,J] = C[i,j,k,l]
-        return V
 
-    Ceff_voigt = tensor_to_voigt(Ceff0)
+    Ceff_voigt = tensor_to_voigt(Ceff0, dim)
 
     results["Ceff_voigt"] = Ceff_voigt
 
@@ -69,21 +66,11 @@ def check_effective_tensors(
                 "Evaluate it before calling this function."
             )
 
-
-        Ceff_full = Ceff0.copy()
-
-        Ceff_full[:, :, 1, 0] = Ceff_full[:, :, 0, 1]
-        Ceff_full[:, :, 2, 0] = Ceff_full[:, :, 0, 2]
-        Ceff_full[:, :, 2, 1] = Ceff_full[:, :, 1, 2]
-
-
         if verbose:
             print("\nComparison with CST")
             print("-------------------")
             print("||Ceff-CST||/||CST||            = ", np.linalg.norm(Ceff0 - CST_np)/np.linalg.norm(CST_np))
             print("||Ceff-CSTsym||/||CSTsym||      = ", np.linalg.norm(Ceff0 - CSTsym_np)/np.linalg.norm(CSTsym_np))
-            print("||Ceff_full-CST||/  ||CST||     = ", np.linalg.norm(Ceff_full - CST_np)/np.linalg.norm(CST_np))
-            print("||Ceff_full-CSTsym||/||CSTsym|| = ", np.linalg.norm(Ceff_full - CSTsym_np)/np.linalg.norm(CSTsym_np))
 
     # Visualization
     if plot:
@@ -91,20 +78,18 @@ def check_effective_tensors(
         # ==========================================================
         # Figure 1
         # ==========================================================
-        Ceff_voigt = tensor_to_voigt(Ceff0)
-        Ceff_full_voigt = tensor_to_voigt(Ceff_full)
-        CST_voigt = tensor_to_voigt(CST_np)
-        CSTsym_voigt = tensor_to_voigt(CSTsym_np)
+        Ceff_voigt = tensor_to_voigt(Ceff0, dim)
+        CST_voigt = tensor_to_voigt(CST_np, dim)
+        CSTsym_voigt = tensor_to_voigt(CSTsym_np, dim)
         
 
         matrices = [
             (Ceff_voigt, "Ceff"),
-            (Ceff_full_voigt, "Ceff full"),
             (CST_voigt, "CST"),
             (CSTsym_voigt, "CSTsym"),
         ]
 
-        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        fig, axes = plt.subplots(1, 3, figsize=(10, 8))
 
         vmin = min(np.min(M) for M, _ in matrices)
         vmax = max(np.max(M) for M, _ in matrices)
@@ -138,18 +123,10 @@ def check_effective_tensors(
             (
                 Ceff_voigt - CSTsym_voigt,
                 r"$C_{\mathrm{eff}} - C^{\mathrm{ST}}_{\mathrm{sym}}$"
-            ),
-            (
-                Ceff_full_voigt - CST_voigt,
-                r"$C_{\mathrm{eff,full}} - C^{\mathrm{ST}}$"
-            ),
-            (
-                Ceff_full_voigt - CSTsym_voigt,
-                r"$C_{\mathrm{eff,full}} - C^{\mathrm{ST}}_{\mathrm{sym}}$"
-            ),
+            )
         ]
 
-        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        fig, axes = plt.subplots(1, 2, figsize=(10, 8))
 
         # Same symmetric scale around zero for all error plots
         max_abs = max(np.max(np.abs(M)) for M, _ in differences)
@@ -240,3 +217,26 @@ def check_effective_tensors(
 
 
     return results
+
+def _dict_to_tensor4(Cdict, dim):
+    C = np.zeros((dim,dim,dim,dim))
+
+    for (l, m), C_lm in Cdict.items():
+        C[:, :, l, m] = np.asarray(C_lm)
+
+    return C
+
+def tensor_to_voigt(C, dim):
+    if dim == 2:
+        pairs = [(0,0), (1,1), (0,1)]
+    else:
+        pairs = [(0,0), (1,1), (2,2), (1,2), (0,2), (0,1)]
+
+    n = len(pairs)
+    V = np.zeros((n, n))
+
+    for I, (i, j) in enumerate(pairs):
+        for J, (k, l) in enumerate(pairs):
+            V[I, J] = C[i, j, k, l]
+
+    return V
