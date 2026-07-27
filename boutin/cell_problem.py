@@ -86,8 +86,8 @@ class CellProblem:
 
         self.mu.rename("mu")
         self.lmbda.rename("lmbda")
-        VTKFile("mu.pvd").write(self.mu)
-        VTKFile("lmbda.pvd").write(self.lmbda)
+        VTKFile("output/mu.pvd").write(self.mu)
+        VTKFile("output/lmbda.pvd").write(self.lmbda)
 
         i, j, r, t = indices(4)
         kron = Identity(self.dim)

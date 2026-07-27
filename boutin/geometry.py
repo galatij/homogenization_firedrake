@@ -2,7 +2,11 @@ import numpy as np
 from firedrake import *
 # TODO: read from data
 
-def inside_dark(x, y, z, data):
+def inside_dark(x, y, z, data, fine_scale=False, ncell=(1,1,1)):
+
+    if fine_scale:
+        x, y, z = periodic_map(x, y, z, ncell)
+
     l = data["l"]
     R = data["R"]
     t = data["t"]
@@ -61,6 +65,33 @@ def inside_dark(x, y, z, data):
         )
 
     return inside_dark
+
+
+def periodic_map(x, y, z, ncell):
+    nx, ny, nz = ncell
+
+    return (
+        periodic_coordinate(x, nx),
+        periodic_coordinate(y, ny),
+        periodic_coordinate(z, nz),
+    )
+
+def periodic_coordinate(x, n):
+    """
+    Periodic map from [0,n] to [0,1].
+    """
+
+    xloc = x
+
+    for k in range(n):
+        xloc = conditional(
+            And(x >= k, x <= k + 1),
+            x - k,
+            xloc
+        )
+
+    return xloc
+
 
 # mesh = CubeMesh(n, n, 1, a)
 

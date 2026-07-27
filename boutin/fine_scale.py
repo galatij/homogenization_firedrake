@@ -4,14 +4,33 @@ import numpy as np
 import os
 
 
-class EffectiveElasticityProblem:
+class FineScaleProblem:
 
-    def __init__(self, mesh, Ceff, tCeff, f, dim):
-        self.mesh = mesh
+    def __init__(self, mu, lmbda, f_fun, dim, fs_geom):
+        nx = fs_geom["nx"]
+        ny = fs_geom["ny"]
+        nz = fs_geom["nz"]
+        n_cell = fs_geom["ncell"]
+        L_cell = fs_geom["Lcell"]
+
+        if dim == 3:
+            self.mesh = BoxMesh(
+                nx*n_cell, ny*n_cell, nz*n_cell, nx*L_cell, ny*L_cell, nz*L_cell,
+                hexahedral=True
+            )
+        elif dim == 2:
+            self.mesh = RectangleMesh(
+                nx*n_cell, ny*n_cell, nx*L_cell, ny*L_cell,
+                quadrilateral=True
+            )
+        else:
+            raise ValueError("dim must be 2 or 3")
+        
         self.dim = dim
-        self.Ceff = Ceff
-        self.tCeff = tCeff
-        self.f_fun = f
+        self.cst = {}
+        self.mu_fun = mu
+        self.lmbda_fun = lmbda
+        self.f_fun = f_fun
 
         self._build_spaces()
         self._build_variational_problem()
@@ -19,6 +38,7 @@ class EffectiveElasticityProblem:
 
 
     def _build_spaces(self):
+        self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = VectorFunctionSpace(self.mesh, "CG", 1)
         if self.dim == 3:
             self.Rspace = VectorFunctionSpace(self.mesh,"CG",1)
@@ -27,31 +47,44 @@ class EffectiveElasticityProblem:
         self.mixed = self.P1 * self.Rspace
 
     def _build_variational_problem(self):
+        # data
+        if self.dim == 3:
+            x, y, z = SpatialCoordinate(self.mesh)
+        else:
+            x,y = SpatialCoordinate(self.mesh)
+            z = Constant(0.)
 
-        U, R = TrialFunctions(self.mixed)
-        V, Q = TestFunctions(self.mixed)
+        mu_expr = self.mu_fun(x,y,z)
+        lmbda_expr = self.lmbda_fun(x,y,z)
 
-        eps = grad(U) + self.vskw(R)
+        self.mu = Function(self.P0).interpolate(mu_expr)
+        self.lmbda = Function(self.P0).interpolate(lmbda_expr)
 
-        # effective stress
-        Ceff2 = as_tensor(self._dict_to_tensor4(self.Ceff[2]))
-        tCeff2 = as_tensor(self._dict_to_tensor4(self.tCeff[2]))
+        self.mu.rename("mu")
+        self.lmbda.rename("lmbda")
+        VTKFile("output/mu_fs.pvd").write(self.mu)
+        VTKFile("output/lmbda_fs.pvd").write(self.lmbda)
 
-        i,j,r,t = indices(4)
 
-        Sigma = as_tensor(
-            Ceff2[i,j,r,t]*grad(U)[r,t] + tCeff2[i,j,r,t]*self.vskw(R)[r,t],
+        i, j, r, t = indices(4)
+        kron = Identity(self.dim)
+        self.cst = as_tensor(
+            2*self.mu*kron[i,r]*kron[j,t] + self.lmbda*kron[i,j]*kron[r,t],
+            (i, j, r, t)
+        )
+
+        # variational forms
+        u, r = TrialFunctions(self.mixed)
+        u_test, r_test = TestFunctions(self.mixed)
+
+        epsilon = grad(u) + self.vskw(r)
+
+        sigma = as_tensor(
+            sum(self.cst[i,j,r,t]*epsilon[r,t] for r in range(self.dim) for t in range(self.dim)),
             (i,j)
         )
 
-
-        self.U = U
-        self.R = R
-
-        self.V = V
-        self.Q = Q
-
-        self.a = (inner(Sigma,grad(V)) + dot(self.mskw(eps),Q)) * dx
+        self.a = inner(sigma, grad(u_test))*dx + dot(self.mskw(epsilon), r_test)*dx
 
 
     def _build_solver(self):
@@ -115,16 +148,15 @@ class EffectiveElasticityProblem:
 
         U,R = w.subfunctions
 
-        self.export_solution(U, R, self.Ceff, self.tCeff)
+        self.export_solution(U, R)
     
         return U,R
 
     def export_solution(
         self,
-        U, R,
-        Ceff, tCeff
+        U, R
     ):
-        folder = os.path.join("output/effective")
+        folder = os.path.join("output/finescale")
         os.makedirs(folder, exist_ok=True)
 
         U.rename("U")
