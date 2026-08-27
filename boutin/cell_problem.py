@@ -8,6 +8,7 @@ print(current_path)
 
 class CellProblem:
     def __init__(self, n, mu, lmbda, dim):
+        print("Initializing cell problem...")
         if dim == 3:
             self.mesh = PeriodicUnitCubeMesh(
                 n, n, n,
@@ -32,6 +33,7 @@ class CellProblem:
         self._build_variational_problem()
         self._build_solver()
         # self._build_solver() # TODO
+        print(" done.")
         
     def _build_variational_problem(self):
 
@@ -137,8 +139,10 @@ class CellProblem:
         
 
     def _build_solver(self):
+        print("Assembling...")
         A = assemble(self.a,
                     mat_type="aij")
+        print(" done.")
 
         self.solver = LinearSolver(
             A,
@@ -171,7 +175,8 @@ class CellProblem:
         )
 
         rhs_uu = -inner(extra_term, grad(u_test)) * dx(domain=self.mesh)
-        rhs_ur = -dot(self.mskw(outer(N_idx, ek)), r_test) * dx(domain=self.mesh)
+        # rhs_ur = -dot(self.mskw(outer(N_idx, ek)), r_test) * dx(domain=self.mesh)
+        rhs_ur = -dot(Constant(0.), r_test) * dx(domain=self.mesh)
         
         if len(idx) >= 3:
             rhs_uu = rhs_uu + dot(c_prev - self.beta * C_prev,u_test) * dx(domain=self.mesh)

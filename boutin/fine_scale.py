@@ -2,11 +2,12 @@ from firedrake import *
 from ufl import as_tensor, as_matrix
 import numpy as np
 import os
-
+import inspect
 
 class FineScaleProblem:
 
     def __init__(self, mu, lmbda, f_fun, dim, fs_geom):
+        print("\nInitializing fine scale problem...")
         nx = fs_geom["nx"]
         ny = fs_geom["ny"]
         nz = fs_geom["nz"]
@@ -35,6 +36,7 @@ class FineScaleProblem:
         self._build_spaces()
         self._build_variational_problem()
         self._build_solver()
+        print(" done.")
 
 
     def _build_spaces(self):
@@ -88,6 +90,7 @@ class FineScaleProblem:
 
 
     def _build_solver(self):
+
         self.bc_u = DirichletBC(
             self.mixed.sub(0),
             Constant(np.zeros(self.dim)),
@@ -109,11 +112,13 @@ class FineScaleProblem:
 
         bcs=[self.bc_u, self.bc_r]
 
+        print("Assembling...")
         A = assemble(
             self.a,
             mat_type="aij",
             bcs=bcs,
         )
+        print(" done.")
 
         self.solver = LinearSolver(
             A,
@@ -124,6 +129,18 @@ class FineScaleProblem:
                 "pc_factor_mat_solver_type":"mumps"
             }
         )
+        # self.solver = LinearSolver(
+        #     A,
+        #     nullspace=None,
+        #     solver_parameters={
+        #         "ksp_type": "gmres",            # Generalized Minimal Residual method
+        #         "pc_type": "ilu",               # Incomplete LU preconditioning
+        #         "ksp_rtol": 1e-7,
+        #         "ksp_atol": 1e-9,
+        #         "ksp_monitor": None,            # Prints convergence history live to terminal
+        #         "ksp_converged_reason": None    # Outputs exactly why it finishes or fails
+        #     }
+        # )
 
 
 
@@ -139,12 +156,15 @@ class FineScaleProblem:
         f_expr = self.f_fun(x,y,z)
         force = Function(self.P1).interpolate(f_expr)
 
+        # L = dot(force,V)*ds(2)
         L = dot(force,V)*dx
         b = assemble(L)
 
         w = Function(self.mixed)
 
+        print("Solving fine scale problem...")
         self.solver.solve(w, b)
+        print(" done.")
 
         U,R = w.subfunctions
 
@@ -159,11 +179,11 @@ class FineScaleProblem:
         folder = os.path.join("output/finescale")
         os.makedirs(folder, exist_ok=True)
 
-        U.rename("U")
-        R.rename("R")
+        U.rename("U_fs")
+        R.rename("R_fs")
 
-        VTKFile(os.path.join(folder, f"U.pvd")).write(U)
-        VTKFile(os.path.join(folder, f"R.pvd")).write(R)
+        VTKFile(os.path.join(folder, f"U_fs.pvd")).write(U)
+        VTKFile(os.path.join(folder, f"R_fs.pvd")).write(R)
 
 
     def _dict_to_tensor4(self, Cdict):
@@ -196,4 +216,30 @@ class FineScaleProblem:
                 [0,-v],
                 [v,0]
             ])
-            
+
+    def _find_point_dof(self, V, point, tol=1e-10):
+
+        coords = V.tabulate_dof_coordinates()
+
+        point = np.asarray(point)
+
+        distance = np.linalg.norm(coords - point, axis=1)
+
+        nodes = np.where(distance < tol)[0]
+
+        if len(nodes) != 1:
+            raise RuntimeError(
+                f"Expected exactly one DOF at {point}, "
+                f"but found {len(nodes)}."
+            )
+
+        return nodes[0]
+
+
+class MyBC(DirichletBC):
+
+    def __init__(self, V, value, nodes):
+        super().__init__(V, value, 0)
+        self.nodes = np.unique(
+            np.asarray(nodes, dtype=np.int32)
+        )

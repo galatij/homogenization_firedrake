@@ -17,15 +17,16 @@ from fine_scale import *
 
 def main():
     # DATA FOR THE LOCAL PROBLEM
-    n = 80
+    n = 50
     data = {
         "R": 5,
         "t": 2.5,
         "l": 25
     }
     dim = 2
-    order = 4
-    load = 5
+    order = 2
+    loadx = -5
+    loady = 0
     mu_dark = 1e10
     mu_light = 1e7
     lmbda_dark = 0
@@ -40,7 +41,9 @@ def main():
     cell_pb = CellProblem(n, mu_fun, lmbda_fun, dim)
     homogenization_pb = HomogenizationProblem(cell_pb, order)
 
+    print("\nComputing effective coefficients...")
     Ceff, tCeff = homogenization_pb.run()
+    print(" done.")
 
     # # CHECK EFFECTIVE COEFFICIENTS
     # results = check_effective_tensors(
@@ -52,24 +55,25 @@ def main():
     #     plot=True
     # )
 
-    # # # SOLVE GLOBAL PROBLEM WITH EFFECTIVE COEFFICIENTS
+    # SOLVE GLOBAL PROBLEM WITH EFFECTIVE COEFFICIENTS
     f_vec = np.zeros(dim)
-    f_vec[1] = load
+    f_vec[0] = loadx
+    f_vec[1] = loady
     f_fun = lambda x,y,z: as_vector(f_vec)
 
-    coarse_mesh = BoxMesh(40,20,1,40,10,1) if dim==3 else RectangleMesh(80,40,40,10)
+    coarse_mesh = BoxMesh(80,40,1,20,10,1) if dim==3 else RectangleMesh(80,40,20,10)
     eff_pb = EffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim)
     eff_pb.solve()
     
-    eff_pb = HoEffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim, order)
-    eff_pb.solve()
+    # # eff_pb = HoEffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim, order)
+    # # eff_pb.solve()
 
     # FINE SCALE PROBLEM
     fs_geom = {
         "nx": 20,
-        "ny": 8,
+        "ny": 10,
         "nz": 1,
-        "ncell": 80,
+        "ncell": 50,
         "Lcell": 1
     }
 
@@ -84,10 +88,8 @@ def main():
             Constant(mu_light)
         )
 
-    # fs_pb = FineScaleProblem(mu_fun, lmbda_fun, f_fun, dim, fs_geom)
-    # fs_pb.solve()
-
-
+    fs_pb = FineScaleProblem(mu_fun, lmbda_fun, f_fun, dim, fs_geom)
+    fs_pb.solve()
 
 
     return 0
@@ -95,13 +97,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
-# n = 120
-# R = 5
-# t = 0.5
-# l = 25
-# a = 2*np.sqrt(l*l/4 + R*R)
-# xc = a/2
-# yc = a/2
-# theta = np.arctan(l/(2*R)) + pi/4

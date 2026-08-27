@@ -3,7 +3,7 @@ from firedrake import *
 # TODO: read from data
 
 def inside_dark(x, y, z, data, fine_scale=False, ncell=(1,1,1)):
-
+    err = 0.02
     if fine_scale:
         x, y, z = periodic_map(x, y, z, ncell)
 
@@ -19,7 +19,7 @@ def inside_dark(x, y, z, data, fine_scale=False, ncell=(1,1,1)):
 
     xc = a/2
     yc = a/2
-    theta = np.arctan(l/(2*R)) + pi/4
+    theta = pi/2 - np.arctan(l/(2*R)) - err
 
 
     rr = sqrt((x-xc)**2 + (y-yc)**2)

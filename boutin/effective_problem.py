@@ -7,6 +7,7 @@ import os
 class EffectiveElasticityProblem:
 
     def __init__(self, mesh, Ceff, tCeff, f, dim):
+        print("\nInitializing effective problem o lowest order...")
         self.mesh = mesh
         self.dim = dim
         self.Ceff = Ceff
@@ -16,6 +17,7 @@ class EffectiveElasticityProblem:
         self._build_spaces()
         self._build_variational_problem()
         self._build_solver()
+        print(" done.")
 
 
     def _build_spaces(self):
@@ -76,11 +78,13 @@ class EffectiveElasticityProblem:
 
         bcs=[self.bc_u, self.bc_r]
 
+        print("Assembling...")
         A = assemble(
             self.a,
             mat_type="aij",
             bcs=bcs,
         )
+        print(" done.")
 
         self.solver = LinearSolver(
             A,
@@ -111,7 +115,9 @@ class EffectiveElasticityProblem:
 
         w = Function(self.mixed)
 
+        print("Solving effective problem...")
         self.solver.solve(w, b)
+        print(" done.")
 
         U,R = w.subfunctions
 
@@ -127,11 +133,11 @@ class EffectiveElasticityProblem:
         folder = os.path.join("output/effective")
         os.makedirs(folder, exist_ok=True)
 
-        U.rename("U")
-        R.rename("R")
+        U.rename("U_eff")
+        R.rename("R_eff")
 
-        VTKFile(os.path.join(folder, f"U.pvd")).write(U)
-        VTKFile(os.path.join(folder, f"R.pvd")).write(R)
+        VTKFile(os.path.join(folder, f"U_eff.pvd")).write(U)
+        VTKFile(os.path.join(folder, f"R_eff.pvd")).write(R)
 
 
     def _dict_to_tensor4(self, Cdict):
