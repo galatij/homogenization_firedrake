@@ -180,6 +180,7 @@ class CellProblem:
         
         if len(idx) >= 3:
             rhs_uu = rhs_uu + dot(c_prev - self.beta * C_prev,u_test) * dx(domain=self.mesh)
+            rhs_ur -= dot(self.mskw(outer(N_idx, ek)), r_test) * dx(domain=self.mesh)
 
         L_u = rhs_uu + rhs_ur
         b = assemble(L_u)

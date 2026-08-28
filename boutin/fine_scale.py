@@ -64,9 +64,6 @@ class FineScaleProblem:
 
         self.mu.rename("mu")
         self.lmbda.rename("lmbda")
-        VTKFile("output/mu_fs.pvd").write(self.mu)
-        VTKFile("output/lmbda_fs.pvd").write(self.lmbda)
-
 
         i, j, r, t = indices(4)
         kron = Identity(self.dim)
@@ -184,6 +181,10 @@ class FineScaleProblem:
 
         VTKFile(os.path.join(folder, f"U_fs.pvd")).write(U)
         VTKFile(os.path.join(folder, f"R_fs.pvd")).write(R)
+
+        
+        VTKFile(os.path.join(folder, f"mu_fs.pvd")).write(self.mu)
+        VTKFile(os.path.join(folder, f"lambda_fs.pvd")).write(self.lmbda)
 
 
     def _dict_to_tensor4(self, Cdict):

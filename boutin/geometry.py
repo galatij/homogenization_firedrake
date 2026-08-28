@@ -7,6 +7,7 @@ def inside_dark(x, y, z, data, fine_scale=False, ncell=(1,1,1)):
     if fine_scale:
         x, y, z = periodic_map(x, y, z, ncell)
 
+    mirror = data["mirror"]
     l = data["l"]
     R = data["R"]
     t = data["t"]
@@ -19,7 +20,12 @@ def inside_dark(x, y, z, data, fine_scale=False, ncell=(1,1,1)):
 
     xc = a/2
     yc = a/2
-    theta = pi/2 - np.arctan(l/(2*R)) - err
+
+    if data["mirror"]:
+        # Reflect x across the local cell center axis (xc = 0.5)
+        x = 2 * xc - x  
+
+    theta = pi/2 - np.arctan(l/(2*R)) - err #if mirror == False else pi/2 + np.arctan(l/(2*R)) + err
 
 
     rr = sqrt((x-xc)**2 + (y-yc)**2)
