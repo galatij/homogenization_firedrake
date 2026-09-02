@@ -7,50 +7,69 @@ current_path = os.getcwd()
 print(current_path)
 
 class CellProblem:
-    def __init__(self, n, mu, lmbda, dim):
+    def __init__(self, n, mu, lmbda, dim, output_dir="output/mixed"):
+
         print("Initializing cell problem...")
+
+        self.dim = dim
+        self.mu_fun = mu
+        self.lmbda_fun = lmbda
+        self.output_dir = output_dir
+
+        # Mesh
         if dim == 3:
-            self.mesh = PeriodicUnitCubeMesh(
-                n, n, n,
-                hexahedral=True
-            )
+            self.mesh = PeriodicUnitCubeMesh(n, n, n, hexahedral=True)
         elif dim == 2:
-            self.mesh = PeriodicUnitSquareMesh(
-                n, n,
-                quadrilateral=True
-            )
+            self.mesh = PeriodicUnitSquareMesh(n, n, quadrilateral=True)
         else:
             raise ValueError("dim must be 2 or 3")
 
-        self.dim = dim
-        self.cst = {}
-        self.CST = {}
-        self.CST_np = np.zeros((dim,dim,dim,dim))
-        self.mu_fun = mu
-        self.lmbda_fun = lmbda
-        self.beta = 1
-
-        self._build_variational_problem()
-        self._build_solver()
-        # self._build_solver() # TODO
-        print(" done.")
-        
-    def _build_variational_problem(self):
-
-        # function spaces
-        self.gradFEspace = TensorFunctionSpace(self.mesh, "DG", 0) # tensor space to compute the derivative
+        # Function spaces
+        self.gradFEspace = TensorFunctionSpace(self.mesh, "DG", 0)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = VectorFunctionSpace(self.mesh, "CG", 1)
+        
         if self.dim == 3:
-            self.Rspace = VectorFunctionSpace(self.mesh,"CG",1)
+            self.Rspace = VectorFunctionSpace(self.mesh,"DG",0)
         else:
-            self.Rspace = FunctionSpace(self.mesh,"CG",1)
+            self.Rspace = FunctionSpace(self.mesh,"DG",0)
 
         self.mixedFEspace = self.P1 * self.Rspace
 
-        self.vectorDG0 = VectorFunctionSpace(self.mesh, "DG", 0)
+        # self.vectorDG0 = VectorFunctionSpace(self.mesh, "DG", 0)
 
-        # nullspace
+        # Material coefficients
+        if dim == 3:
+            x, y, z = SpatialCoordinate(self.mesh)
+        else:
+            x, y = SpatialCoordinate(self.mesh)
+            z = Constant(0.0)
+        
+        mu_expr = self.mu_fun(x, y, z)
+        lmbda_expr = self.lmbda_fun(x, y, z)
+        
+        self.mu = Function(self.P0).interpolate(mu_expr)
+        self.lmbda = Function(self.P0).interpolate(lmbda_expr)
+        
+        self.mu.rename("mu")
+        self.lmbda.rename("lambda")
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        VTKFile(os.path.join(output_dir, "mu.pvd")).write(self.mu)
+        VTKFile(os.path.join(output_dir, "lambda.pvd")).write(self.lmbda)
+
+        i, j, r, t = indices(4)
+        I = Identity(self.dim)
+        
+        self.cst = as_tensor(
+            2.0 * self.mu * I[i, r] * I[j, t]
+            +
+            self.lmbda * I[i, j] * I[r, t],
+            (i, j, r, t)
+        )
+
+        # Nullspace
         basis = []
         for i in range(self.dim):
             X = Function(self.P1)
@@ -69,79 +88,43 @@ class CellProblem:
             ]
         )
 
-        # data
-        if self.dim == 3:
-            x, y, z = SpatialCoordinate(self.mesh)
-        else:
-            x,y = SpatialCoordinate(self.mesh)
-            z = Constant(0.)
+        # Variational problem
+        self._build_variational_problem()
 
-        mu_expr = self.mu_fun(x,y,z)
-        lmbda_expr = self.lmbda_fun(x,y,z)
+        # Solver
+        self._build_solver()
 
-        self.mu = Function(self.P0).interpolate(mu_expr)
-        self.lmbda = Function(self.P0).interpolate(lmbda_expr)
+        # Storage for homogenized coefficients
+        self.Ceff = {}
+        self.tCeff = {} # Optional storage of cell solutions self.solutions = {}
+        self.solutions = {}
 
-        volume = assemble(Constant(1.0) * dx(domain=self.mesh))
-        mu_avg = assemble(self.mu * dx) / volume
-        lmbda_avg = assemble(self.lmbda * dx) / volume
+        print(" done.")
 
-        self.mu.rename("mu")
-        self.lmbda.rename("lmbda")
-        VTKFile("output/mu.pvd").write(self.mu)
-        VTKFile("output/lmbda.pvd").write(self.lmbda)
 
-        i, j, r, t = indices(4)
-        kron = Identity(self.dim)
-        self.cst = as_tensor(
-            2*self.mu*kron[i,r]*kron[j,t] + self.lmbda*kron[i,j]*kron[r,t],
-            (i, j, r, t)
-        )
-        self.CST = as_tensor(
-            2*mu_avg*kron[i,r]*kron[j,t] + lmbda_avg*kron[i,j]*kron[r,t],
-            (i, j, r, t)
-        )
+    def _build_variational_problem(self):
 
-        for iii in range(self.dim):
-            for jjj in range(self.dim):
-                for kkk in range(self.dim):
-                    for lll in range(self.dim):
-                        self.CST_np[iii,jjj,kkk,lll] = (
-                            2*mu_avg*(iii==kkk)*(jjj==lll)
-                            +
-                            lmbda_avg*(iii==jjj)*(kkk==lll)
-                        )
-
-        # variational forms
         u, r = TrialFunctions(self.mixedFEspace)
         u_test, r_test = TestFunctions(self.mixedFEspace)
 
-        epsilon = grad(u) + self.vskw(r)
+        eps = grad(u) + self.vskw(r)
+
+        i, j, rr, tt = indices(4)
         
         sigma = as_tensor(
-            sum(self.cst[i,j,r,t]*epsilon[r,t] for r in range(self.dim) for t in range(self.dim)),
+            sum(self.cst[i,j,rr,t]*eps[rr,t] for rr in range(self.dim) for t in range(self.dim)),
             (i,j)
         )
 
-        self.a = inner(sigma, grad(u_test))*dx + dot(self.mskw(epsilon), r_test)*dx
+        self.a = inner(sigma, grad(u_test))*dx + dot(self.mskw(eps), r_test)*dx
 
-        # print(type(epsilon))
-        # print(epsilon.ufl_shape)
-        # # print(repr(epsilon))
-
-        # print(type(self.cst))
-        # print(self.cst.ufl_shape)
-        # # print(repr(self.cst))
-
-        # print(type(sigma))
-        # print(sigma.ufl_shape)
-        # # print(repr(sigma))        
-        
 
     def _build_solver(self):
+
         print("Assembling...")
-        A = assemble(self.a,
-                    mat_type="aij")
+
+        A = assemble(self.a, mat_type="aij")
+
         print(" done.")
 
         self.solver = LinearSolver(
@@ -155,148 +138,152 @@ class CellProblem:
         )
         
 
-    def solve(self, idx, N_idx, c_prev, tildec_prev, C_prev, tildeC_prev):
+    def solve(self, l, m):
+        """
+        Solve the mixed first-order cell problem
 
-        kron = Identity(self.dim)
-        volume = assemble(Constant(1.0)*dx(domain=self.mesh))
+            -div[c : (e_l x e_m + grad(X) + vskw(P))] = 0
 
-        u_test, r_test = TestFunctions(self.mixedFEspace)
+        together with the mixed constraint
 
-        # -----------------------------------------
-        # gradU related systems
-        # -----------------------------------------        
-        ek = as_vector(tuple(kron[:,idx[-1]]))
+            mskw(e_l x e_m + grad(X) + vskw(P)) = 0.
+        
+        The resulting effective tensor contribution is
+        
+            Ceff[:, :, l, m] = <sigma[:, :]>
+            
+        """
+        
+        print( f"\nSolving mixed cell problem ({l},{m})" )
+
+        e_l = np.zeros(self.dim)
+        e_m = np.zeros(self.dim)
+        e_l[l] = 1.0
+        e_m[m] = 1.0
+        e_l = as_vector(tuple(e_l))
+        e_m = as_vector(tuple(e_m))
+        A_macro = outer(e_l, e_m)
+        A_sym = 0.5*( outer(e_l, e_m) + outer(e_m, e_l))
 
         i, j, r, t = indices(4)
-        prev_term = outer(N_idx, ek)
-        extra_term = as_tensor(
-            self.cst[i,j,r,t]*prev_term[r,t],
-            (i,j)
+        
+        # -----------------------------------------
+        # gradU related systems
+        
+        # RHS
+        # a((X,P),(v,q))
+        #     = - integral c:A_sym : grad(v) 
+        #
+        # --------------------------------------------------
+        sigma_macro = as_tensor(sum(
+            self.cst[i, j, r, t] * A_sym[r, t]
+            for r in range(self.dim)
+            for t in range(self.dim)),
+            (i, j)
         )
 
-        rhs_uu = -inner(extra_term, grad(u_test)) * dx(domain=self.mesh)
-        # rhs_ur = -dot(self.mskw(outer(N_idx, ek)), r_test) * dx(domain=self.mesh)
-        rhs_ur = -dot(Constant(0.), r_test) * dx(domain=self.mesh)
         
-        if len(idx) >= 3:
-            rhs_uu = rhs_uu + dot(c_prev - self.beta * C_prev,u_test) * dx(domain=self.mesh)
-            rhs_ur -= dot(self.mskw(outer(N_idx, ek)), r_test) * dx(domain=self.mesh)
+        u_test, r_test = TestFunctions( self.mixedFEspace )
+        
+        L = ( -inner(sigma_macro, grad(u_test)) - dot(Constant(0.), r_test) ) * dx(domain=self.mesh)
+        b = assemble(L)
 
-        L_u = rhs_uu + rhs_ur
-        b = assemble(L_u)
         wh1 = Function(self.mixedFEspace)
-        u1, r1 = wh1.subfunctions
         self.solver.solve(wh1, b)
+        
+        X, P = wh1.subfunctions
 
-        # compute c and C
-        eps = outer(N_idx, ek) + grad(u1) + self.vskw(r1)
-        c = Function(self.gradFEspace)
-        c.interpolate(as_tensor(
-            self.cst[i,j,r,t]*eps[r,t],
-            (i,j)
-        ))
+        X.rename(f"X_{l}{m}")
+        P.rename(f"P_{l}{m}")
+
+        # Microscopic strain and stress
+        eps = A_macro + grad(X) + self.vskw(P)
+
+        skweps_expr = self.mskw(grad(X) + self.vskw(P))
+        skweps = Function(self.Rspace, name="skweps")
+        skweps.interpolate(skweps_expr)
+        print("||Seps|| =", norm(skweps))
+
+        P_expected = Function(self.Rspace, name="P_expected")
+        P_expected.interpolate(-0.5 * self.mskw(grad(X)))
+        P_diff = Function(self.Rspace, name="P_diff")
+        P_diff.interpolate(P - P_expected)
+        print("||P + 0.5 mskw(gradX)|| =", norm(P_diff))
+
+       
+        c_expr = as_tensor(
+            sum( self.cst[i, j, r, t] * eps[r, t]
+                for r in range(self.dim)
+                for t in range(self.dim)),
+                (i, j)
+            )
+        
+        c = Function(self.gradFEspace, name = "c")
+        c.interpolate(c_expr)
+
+        # Effective tensor
+        volume = assemble(Constant(1.0) * dx(domain=self.mesh))
+
         C = np.zeros((self.dim,self.dim))
         for ii in range(self.dim):
             for jj in range(self.dim):
                 C[ii,jj] = assemble(c[ii,jj]*dx)/volume
 
-        print("||X|| =", norm(u1))
-        print("||P|| =", norm(r1))
-        # print(type(c))
-        # print(c.ufl_shape)
-        # # print(repr(c))
-        
-        # print(type(C))
-        # # print(C.ufl_shape) # ERROR
-        # # print(repr(C))
-
-
-        # -----------------------------------------
-        # gradS*R related system
-        # -----------------------------------------
-        rhs_ru = dot(as_vector(Constant(np.zeros(self.dim))), u_test) * dx(domain=self.mesh)
-
-        if len(idx) >= 3:
-            rhs_ru = rhs_ru + dot(tildec_prev - self.beta* tildeC_prev, u_test) * dx(domain=self.mesh)
-
-        L_r = rhs_ru
-        b = assemble(L_r)
-        wh2 = Function(self.mixedFEspace)
-        self.solver.solve(wh2, b)
-
-        u2, r2 = wh2.subfunctions
-
-        # print("||xi|| =", norm(u2))
-        # print("||eta|| =", norm(r2))
-
-        # compute tildec and tildeC
-        tilde_eps= grad(u2) + self.vskw(r2)
-        tildec = Function(self.gradFEspace)
-        tildec.interpolate(as_tensor(
-            self.cst[i,j,r,t]*tilde_eps[r,t],
-            (i,j)
-        ))
-
-        tildeC = np.zeros((self.dim,self.dim))
-        for ii in range(self.dim):
-            for jj in range(self.dim):
-                tildeC[ii,jj] = assemble(tildec[ii,jj]*dx)/volume
-
-        self.export_solution(
-            idx,
-            u1, r1,
-            u2, r2,
-            c, C,
-            tildec, tildeC
+        rotation_residual = assemble(
+            dot(
+                self.mskw(grad(X) + self.vskw(P)),
+                r_test
+            ) * dx
         )
 
-        return c, tildec, C, tildeC, u1
+        print("||X|| =", norm(X))
+        print("||P|| =", norm(P))
+        print("||eps|| = ", norm(eps))
+        # print("||Seps|| = ", norm(skweps))
+        
+        # with rotation_residual.dat.vec_ro as vec:
+        #     print("||discrete rotational residual|| =", vec.norm())
+        # print("||skw_gradX|| =", norm(self.mskw(grad(X))))
+        # print("||skw_P||     =", norm(self.mskw(self.vskw(P))))
+
+        # Export
+        folder = os.path.join( self.output_dir, f"cell_{l}{m}" )
+        os.makedirs( folder, exist_ok=True )
+
+        VTKFile(os.path.join( folder, f"P_{l}{m}.pvd")).write(P)
+        VTKFile(os.path.join( folder, f"sigma_{l}{m}.pvd")).write(c)
+        np.save(os.path.join( folder, f"C_{l}{m}.npy"), C)
+
+        return X, P, c, C
     
+    def solve_all(self):
+        Ceff = np.zeros((self.dim, self.dim, self.dim, self.dim))
 
-    def export_solution(
-        self,
-        idx,
-        u1, r1,
-        u2, r2,
-        c, C,
-        tildec, tildeC
-    ):
+        solutions = {}
+        for l in range(self.dim):
+            for m in range(self.dim):
+                X, P, sigma, C_lm = self.solve(l, m)
+                solutions[(l, m)] = (X, P, sigma)
+                Ceff[:, :, l, m] = C_lm
 
-        folder = os.path.join("output", f"order_{len(idx)}")
-        os.makedirs(folder, exist_ok=True)
+            self.Ceff = Ceff
+            np.save(os.path.join( self.output_dir, "Ceff.npy"), Ceff)
 
-        suffix = "".join(map(str, idx))
+        
+        tCeff = np.zeros((self.dim, self.dim, self.dim, self.dim))
+        volume = assemble(Constant(1.0) * dx(domain=self.mesh))
+        for i in range(self.dim):
+            for j in range(self.dim):
+                for l in range(self.dim):
+                    for m in range(self.dim):
+                        tCeff[i, j, l, m] = (
+                            assemble( self.cst[i, j, l, m] * dx ) / volume
+                        )
 
-        u1.rename("X")
-        r1.rename("P")
+        self.tCeff = tCeff
 
-        u2.rename("Xi")
-        r2.rename("Eta")
+        return Ceff, tCeff, solutions
 
-        c.rename("c")
-        tildec.rename("tildec")
-
-
-        VTKFile(os.path.join(folder, f"X_{suffix}.pvd")).write(u1)
-        VTKFile(os.path.join(folder, f"P_{suffix}.pvd")).write(r1)
-
-        VTKFile(os.path.join(folder, f"Xi_{suffix}.pvd")).write(u2)
-        VTKFile(os.path.join(folder, f"Eta_{suffix}.pvd")).write(r2)
-
-        VTKFile(os.path.join(folder, f"c_{suffix}.pvd")).write(c)
-        VTKFile(os.path.join(folder, f"tildec_{suffix}.pvd")).write(tildec)
-
-        Cfun = Function(self.gradFEspace, name="C")
-        Cfun.interpolate(as_tensor(C.tolist()))
-
-        tCfun = Function(self.gradFEspace, name="tildeC")
-        tCfun.interpolate(as_tensor(tildeC.tolist()))
-
-        VTKFile(os.path.join(folder, f"C_{suffix}.pvd")).write(Cfun)
-        VTKFile(os.path.join(folder, f"tildeC_{suffix}.pvd")).write(tCfun)
-
-        np.save(os.path.join(folder, f"C_{suffix}.npy"), C)
-        np.save(os.path.join(folder, f"tildeC_{suffix}.npy"), tildeC)
 
     def mskw(self, A):
         if self.dim == 3:
@@ -320,4 +307,9 @@ class CellProblem:
                 [0,-v],
                 [v,0]
             ])
-                
+
+    def symgrad(self, u):
+
+        return 0.5 * (
+            grad(u) + grad(u).T
+        )

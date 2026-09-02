@@ -156,11 +156,3 @@ class SolutionStore:
     def __tensor4_column(self, A, j, k, l):
         return as_vector([A[i,j,k,l] for i in range(self.dim)])
 
-        
-    # def _generate_multiindices(self, l):
-    #     if l == 0:
-    #         return [()]
-    #     return [
-    #         tuple(idx)
-    #         for idx in combinations_with_replacement(range(self.cell.dim), l)
-    #     ]

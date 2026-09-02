@@ -45,8 +45,8 @@ def check_effective_tensors(
         raise ValueError(f"Unsupported dimension {dim}")
     
     # Convert effective tensors
-    Ceff0 = _dict_to_tensor4(Ceff0, dim)
-    tCeff0 = _dict_to_tensor4(tCeff0, dim)
+    # Ceff0 = _dict_to_tensor4(Ceff0, dim)
+    # tCeff0 = _dict_to_tensor4(tCeff0, dim)
 
     # Voigt conversion
 

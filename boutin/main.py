@@ -6,6 +6,7 @@ from effective_problem import *
 from ho_effective_problem import *
 from check_effective import *
 from fine_scale import *
+from cell_problem_primal import *
 
 # @TODO:
 # 1. understand the symmetry of the effective tensor
@@ -16,11 +17,12 @@ from fine_scale import *
 
 
 def main():
+    primal = False
     solve_hom = True
-    check_coeff = False
-    solve_eff = False
-    solve_fs = True
-    mirror_structure = False
+    check_coeff = True
+    solve_eff = True
+    solve_fs = False
+    mirror_structure = True
 
     # DATA FOR THE LOCAL PROBLEM
     n = 50
@@ -31,10 +33,10 @@ def main():
         "mirror": mirror_structure
     }
     dim = 2
-    order = 4
+    order = 2
     loadx = 0
     loady = -5
-    mu_dark = 1e10
+    mu_dark = 1e9
     mu_light = 1e7
     lmbda_dark = 0
     lmbda_light = 0
@@ -46,26 +48,29 @@ def main():
 
     if solve_hom:
         # SOLVE THE LOCAL PERIODIC PROBLEM AND COMPUTE EFFECTIVE COEFFICIENTS
-        cell_pb = CellProblem(n, mu_fun, lmbda_fun, dim)
-        homogenization_pb = HomogenizationProblem(cell_pb, order)
-
         print("\nComputing effective coefficients...")
-        Ceff, tCeff = homogenization_pb.run()
+        if primal:
+            cell_pb = PrimalCellProblem(n, mu_fun, lmbda_fun, dim, output_dir="output/primal")
+            Ceff, _ = cell_pb.solve_all()        
+        else:
+            cell_pb = CellProblem(n, mu_fun, lmbda_fun, dim, output_dir="output/mixed")
+            Ceff, tCeff, _ = cell_pb.solve_all()
         print(" done.")
 
-    # CHECK EFFECTIVE COEFFICIENTS
-    if check_coeff and solve_hom:
-        results = check_effective_tensors(
-            dim,
-            Ceff[2],
-            tCeff[2],
-            CST=cell_pb.CST_np,
-            verbose=True,
-            plot=True
-        )
 
-    elif check_coeff and not solve_hom:
-        print("Warning: need to activate solve_hom")
+    # CHECK EFFECTIVE COEFFICIENTS
+    # if check_coeff and solve_hom:
+    #     results = check_effective_tensors(
+    #         dim,
+    #         Ceff,
+    #         tCeff,
+    #         CST=tCeff,
+    #         verbose=True,
+    #         plot=True
+    #     )
+
+    # elif check_coeff and not solve_hom:
+    #     print("Warning: need to activate solve_hom")
 
     # SOLVE GLOBAL PROBLEM WITH EFFECTIVE COEFFICIENTS
     f_vec = np.zeros(dim)
@@ -76,16 +81,23 @@ def main():
     if solve_eff:
         coarse_mesh = BoxMesh(80,40,1,20,10,1) if dim==3 else RectangleMesh(80,40,20,10)
         if order==2:
-            eff_pb = EffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim)
+            if primal:
+                eff_pb = EffectivePrimal(coarse_mesh, Ceff, f_fun, dim)
+            else:
+                eff_pb = EffectiveMixed(coarse_mesh, Ceff, tCeff, f_fun, dim)
             eff_pb.solve()
         else:
+            if primal:
+                raise NotImplementedError(f"No implemented yet")
+            
             eff_pb = HoEffectiveElasticityProblem(coarse_mesh, Ceff, tCeff, f_fun, dim, order)
             eff_pb.solve()
 
+
     # FINE SCALE PROBLEM
     fs_geom = {
-        "nx": 6,
-        "ny": 3,
+        "nx": 20,
+        "ny": 10,
         "nz": 1,
         "ncell": 50,
         "Lcell": 1
