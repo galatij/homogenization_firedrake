@@ -7,13 +7,14 @@ from firedrake.output import VTKFile
 
 class PrimalCellProblem:
 
-    def __init__(self, n, mu, lmbda, dim, output_dir="output/primal"):
+    def __init__(self, n, mu, lmbda, dim, order, output_dir="output/primal"):
 
         print("Initializing primal cell problem...")
 
         self.dim = dim
         self.mu_fun = mu
         self.lmbda_fun = lmbda
+        self.order = order
         self.output_dir = output_dir
 
         # Mesh
