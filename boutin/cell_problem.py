@@ -3,33 +3,61 @@ from ufl import as_vector, as_matrix
 import numpy as np
 import os
 from firedrake.output import VTKFile
+from geometry import *
 
 
 class CellProblem:
 
-    def __init__(self, n, mu, lmbda, dim, order, output_dir="output/primal"):
+    def __init__(self, data, output_dir="output/cellpb"):
 
         print("Initializing primal cell problem...")
 
-        self.dim = dim
-        self.mu_fun = mu
-        self.lmbda_fun = lmbda
         self.beta = 1
-        self.order = order
+        self.dim = data["dim"]
+        self.order = data["order"]
         self.output_dir = output_dir
+        self.mu_dark = data["coefficients"]["mu_dark"]
+        self.mu_light = data["coefficients"]["mu_light"]
+        self.lmbda_dark = data["coefficients"]["lmbda_dark"]
+        self.lmbda_light = data["coefficients"]["lmbda_light"]
+        gmsh_flag = data["flags"]["gmsh"]
+        n = data["geometry"]["nref_cell"]
 
         # Mesh
-        if dim == 3:
-            self.mesh = PeriodicUnitCubeMesh(n, n, n, hexahedral=True)
-        elif dim == 2:
-            self.mesh = PeriodicUnitSquareMesh(n, n, quadrilateral=True)
-        else:
-            raise ValueError("dim must be 2 or 3")
+        if not gmsh_flag:
+            if self.dim == 3:
+                self.mesh = PeriodicUnitCubeMesh(n, n, n, hexahedral=True)
+            elif self.dim == 2:
+                self.mesh = PeriodicUnitSquareMesh(n, n, quadrilateral=True)
+            else:
+                raise ValueError("dim must be 2 or 3")
 
-        if order not in [2, 4]:
-            raise ValueError(
-                "order must be 2 or 4"
+            if self.order not in [2, 4]:
+                raise ValueError(
+                    "order must be 2 or 4"
+                )
+        else:
+            t=data["geometry"]["crossed"]["t"]
+            n_micro = data["geometry"]["fs_geom"]["n_micro_fs"]
+            generate_XX_mesh(
+                "output/X_mesh.msh",
+                t,
+                mesh_size_matrix=t/n_micro,
+                mesh_size_fiber=t/n_micro,
             )
+
+            check_gmsh_periodicity("output/X_mesh.msh")
+
+            # Tell PETSc/DMPlex to read the $Periodic section
+            # from the Gmsh file.
+            opts = PETSc.Options()
+            opts["dm_plex_gmsh_periodic"] = True
+            opts["dm_plex_gmsh_use_regions"] = True
+            opts["dm_plex_gmsh_use_generic"] = True
+
+            self.mesh = Mesh("output/X_mesh.msh")
+
+            check_periodic_X_mesh(self.mesh)
         
         # Function spaces
         self.gradFEspace = TensorFunctionSpace(self.mesh, "DG", 0)
@@ -37,17 +65,31 @@ class CellProblem:
         self.P1 = VectorFunctionSpace(self.mesh, "CG", 1)
 
         # Material coefficients
-        if dim == 3:
+        if self.dim == 3:
             x, y, z = SpatialCoordinate(self.mesh)
         else:
             x, y = SpatialCoordinate(self.mesh)
             z = Constant(0.0)
 
-        mu_expr = self.mu_fun(x, y, z)
-        lmbda_expr = self.lmbda_fun(x, y, z)
+        # mu_expr = self.mu_fun(x, y, z)
+        # lmbda_expr = self.lmbda_fun(x, y, z)
 
-        self.mu = Function(self.P0).interpolate(mu_expr)
-        self.lmbda = Function(self.P0).interpolate(lmbda_expr)
+        # self.mu = Function(self.P0).interpolate(mu_expr)
+        # self.lmbda = Function(self.P0).interpolate(lmbda_expr)
+
+        fiber_cells = self.mesh.cell_subset(1)
+        matrix_cells = self.mesh.cell_subset(2)
+
+        self.mu = Function(self.P0, name="mu")
+        self.lmbda = Function(self.P0, name="lambda")
+
+        self.mu.dat.data[:] = Constant(self.mu_light)
+        self.lmbda.dat.data[:] = Constant(self.lmbda_light)
+
+        fiber_cells = self.mesh.cell_subset(1)
+
+        self.mu.dat.data[fiber_cells.indices] = Constant(self.mu_dark)
+        self.lmbda.dat.data[fiber_cells.indices] = Constant(self.lmbda_dark)
 
         self.mu.rename("mu")
         self.lmbda.rename("lambda")

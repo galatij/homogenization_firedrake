@@ -5,20 +5,44 @@ import os
 
 class EffectiveProblemLinear:
 
-    def __init__(self, mesh, ell, Ceff, f, dim, order = 2, is_per = False):
+    def __init__(self, data, Ceff, f):
+
+        flags = data["flags"]
+        dim = data["dim"]
 
         print("\nInitializing effective primal problem...")
+        fs_geom = data["geometry"]["fs_geom"]
+        # nx_ref = fs_geom["n_micro"]*fs_geom["nx_macro"]
+        # ny_ref = fs_geom["n_micro"]*fs_geom["ny_macro"]
+        # nz_ref = fs_geom["n_micro"]*fs_geom["nz_macro"]
+        nx_ref = data["geometry"]["nref_cell"]
+        ny_ref = data["geometry"]["nref_cell"]
+        nz_ref = data["geometry"]["nref_cell"]
+        Lx = fs_geom["Lx_macro"]
+        Ly = fs_geom["Ly_macro"]
+        Lz = fs_geom["Lz_macro"]
 
-        self.mesh = mesh
-        self.ell = ell
-        self.dim = dim
+        if flags["solve_eff"]:
+            if flags["is_per"]:
+                if dim == 3:
+                    self.mesh = PeriodicBoxMesh(nx_ref, ny_ref, nz_ref, Lx,Ly, Lz)
+                else:
+                    self.mesh = PeriodicRectangleMesh(nx_ref, ny_ref, Lx, Ly)
+            else:
+                if dim == 3:
+                    self.mesh = BoxMesh(nx_ref, ny_ref, nz_ref, Lx, Ly, Lz)
+                else:
+                    self.mesh = RectangleMesh(nx_ref, ny_ref, Lx, Ly)
+
+        self.epsilon = fs_geom["eps_ratio"]
+        self.dim = data["dim"]
         self.f_fun = f
-        self.order = order
-        self.is_periodic = is_per
+        self.order = data["order"]
+        self.is_periodic = flags["is_per"]
 
         self.C0 = Ceff[0]
 
-        if order >= 4:
+        if self.order >= 4:
             self.C1 = Ceff[1]
             self.C2 = Ceff[2]
         else:
@@ -34,7 +58,7 @@ class EffectiveProblemLinear:
     def _build_spaces(self):
 
         # Displacement
-        self.Uspace = VectorFunctionSpace(self.mesh, "CG", 3)
+        self.Uspace = VectorFunctionSpace(self.mesh, "CG", 2)
 
         if self.is_periodic:
             # Nullspace
@@ -172,7 +196,7 @@ class EffectiveProblemLinear:
             U_eff.assign(U0)
 
         else:
-            U_eff.interpolate(U0 + self.ell * U1 + self.ell**2 * U2)
+            U_eff.interpolate(U0 + self.epsilon * U1 + self.epsilon**2 * U2)
 
         if self.order == 2:
             self.export(U_eff, U0)
@@ -182,11 +206,6 @@ class EffectiveProblemLinear:
         return U_eff
 
     def export(self, U_eff, U0, U1 = None, U2 = None, filename="output/effective_linear.pvd"):
-
-        # if not hasattr(self, "U_eff"):
-        #     raise RuntimeError(
-        #         "You must call solve() before export()."
-        #     )
 
         vtk = VTKFile(filename)
 
@@ -278,18 +297,3 @@ class EffectiveProblemLinear:
         )
 
         return Sigma
-
-    # def export_solution(
-    #     self,
-    #     U,
-    #     Sigma
-    # ):
-
-    #     folder = os.path.join("output/effective_primal")
-
-    #     os.makedirs(folder, exist_ok=True)
-
-    #     U.rename("U_eff_primal")
-    #     Sigma.rename("Sigma_eff_primal")
-    #     VTKFile(os.path.join(folder, "U_eff.pvd")).write(U)
-    #     VTKFile(os.path.join(folder, "Sigma_eff.pvd")).write(Sigma)
