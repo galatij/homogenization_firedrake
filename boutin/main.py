@@ -22,12 +22,12 @@ def main():
         "order": 4,                                     # order of the effective equation
         "output_dir": "output/cellpb",
         "flags": {
-            "solve_hom": False,
-            "solve_eff": False,
-            "solve_fs": True,
+            "solve_hom": True,
+            "solve_eff": True,
+            "solve_fs": False,
             "check_coeff": False,
             "convergence_test": False,
-            "numerical_convergence_test": True,
+            "numerical_convergence_test": False,
             "is_per": True,
             "mirror_structure": False,
             "microstructure": "X",                       # "X" / "66" / "layered"
@@ -45,7 +45,7 @@ def main():
             "lmbda_light": 0
         },
         "geometry": {
-            "nref_cell": 40,                            # number of refinements
+            "nref_cell": 16,                            # number of refinements
             "chiral": {
                 "R": 7,   #5                              # radius
                 "t": 3.5,   # 2.5                            # thikness of the ligaments
@@ -58,11 +58,11 @@ def main():
                 "l_micro": 1                            # length of the domain
             },
             "fs_geom": {
-                "nx_macro": 2,                         # number of microdomains (cell) along x
-                "ny_macro": 2,                          # number of microdomains (cell) along y
+                "nx_macro": 3,                         # number of microdomains (cell) along x
+                "ny_macro": 3,                          # number of microdomains (cell) along y
                 "nz_macro": 1,                          # number of microdomains (cell) along z
                 "n_micro_fs": 1,                          # nref in a single microdomain (cell)
-                "n_micro_eff": 1,
+                "n_micro_eff": 16,
                 "Lx_macro": 8,                         # length of macroscopic domain along x
                 "Ly_macro": 8,                          # length of macroscopic domain along y
                 "Lz_macro": 1,                          # length of macroscopic domain along z
@@ -72,7 +72,7 @@ def main():
             "nx_macro_values": [1, 2, 4],
             "ny_macro_values": [1, 2, 4],
             "reference": "fine_scale",
-            "numerical_refinements": 4,
+            "numerical_refinements": 6,
             "current_level": 0
         }
     }
@@ -104,8 +104,7 @@ def main():
             conv.plot_relative_errors(save=True, show=True)
 
     else:
-        # U_fs, U_eff, U_RStrain, U_Lagrange = solve_case(data)
-        pass
+        U_fs, U_eff, U_RStrain, U_Lagrange = solve_case(data)
 
     data["geometry"]["fs_geom"]["l_micro"] = data["geometry"]["fs_geom"]["Lx_macro"]/data["geometry"]["fs_geom"]["nx_macro"] # length of a microscopic domain
     data["geometry"]["fs_geom"]["eps_ratio"] = data["geometry"]["fs_geom"]["l_micro"]/data["geometry"]["fs_geom"]["Lx_macro"] # multiscale parameters (ratio)
