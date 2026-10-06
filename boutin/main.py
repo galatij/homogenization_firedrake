@@ -24,10 +24,10 @@ def main():
         "flags": {
             "solve_hom": True,
             "solve_eff": True,
-            "solve_fs": False,
+            "solve_fs": True,
             "check_coeff": False,
             "convergence_test": False,
-            "numerical_convergence_test": False,
+            "numerical_convergence_test": True,
             "is_per": True,
             "mirror_structure": False,
             "microstructure": "X",                       # "X" / "66" / "layered"
@@ -58,21 +58,21 @@ def main():
                 "l_micro": 1                            # length of the domain
             },
             "fs_geom": {
-                "nx_macro": 3,                         # number of microdomains (cell) along x
-                "ny_macro": 3,                          # number of microdomains (cell) along y
+                "nx_macro": 16,                         # number of microdomains (cell) along x
+                "ny_macro": 16,                          # number of microdomains (cell) along y
                 "nz_macro": 1,                          # number of microdomains (cell) along z
-                "n_micro_fs": 1,                          # nref in a single microdomain (cell)
-                "n_micro_eff": 16,
+                "n_micro_fs": 2,                          # nref in a single microdomain (cell)
+                "n_micro_eff": 8,
                 "Lx_macro": 8,                         # length of macroscopic domain along x
                 "Ly_macro": 8,                          # length of macroscopic domain along y
                 "Lz_macro": 1,                          # length of macroscopic domain along z
             }
         },
         "convergence": {
-            "nx_macro_values": [1, 2, 4],
-            "ny_macro_values": [1, 2, 4],
+            "nx_macro_values": [1, 2, 4, 8, 16],
+            "ny_macro_values": [1, 2, 4, 8, 16],
             "reference": "fine_scale",
-            "numerical_refinements": 6,
+            "numerical_refinements": 0,
             "current_level": 0
         }
     }
@@ -82,8 +82,7 @@ def main():
             data,
             solve_case
         )
-
-    if data["flags"]["convergence_test"]:
+    elif data["flags"]["convergence_test"]:
         mu_dark_list = [1e7,1e8,1e9,1e10]
         for muuu in mu_dark_list:
                 
@@ -102,7 +101,6 @@ def main():
             conv.print_table()
             conv.plot_convergence(save=True, show=True)
             conv.plot_relative_errors(save=True, show=True)
-
     else:
         U_fs, U_eff, U_RStrain, U_Lagrange = solve_case(data)
 

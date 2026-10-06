@@ -95,7 +95,7 @@ class FineScaleProblem:
     def _build_spaces(self):
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = VectorFunctionSpace(self.mesh, "CG", 1)
-        self.Uspace = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.Uspace = VectorFunctionSpace(self.mesh, "CG", 2)
 
     def _build_variational_problem(self):
         # data

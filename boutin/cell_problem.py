@@ -40,13 +40,13 @@ class CellProblem:
             t=data["geometry"]["crossed"]["t"]
             n_micro = data["geometry"]["fs_geom"]["n_micro_fs"]
             generate_XX_mesh(
-                "output/X_mesh.msh",
                 t,
-                mesh_size_matrix=t/n_micro,
+                mesh_size_matrix=4*t/n_micro,
                 mesh_size_fiber=t/n_micro,
+                filename="output/X_mesh_cell.msh"
             )
 
-            check_gmsh_periodicity("output/X_mesh.msh")
+            check_gmsh_periodicity("output/X_mesh_cell.msh")
 
             # Tell PETSc/DMPlex to read the $Periodic section
             # from the Gmsh file.
@@ -55,7 +55,7 @@ class CellProblem:
             opts["dm_plex_gmsh_use_regions"] = True
             opts["dm_plex_gmsh_use_generic"] = True
 
-            self.mesh = Mesh("output/X_mesh.msh")
+            self.mesh = Mesh("output/X_mesh_cell.msh")
 
             check_periodic_X_mesh(self.mesh)
         

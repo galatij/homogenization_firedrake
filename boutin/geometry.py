@@ -314,10 +314,10 @@ def check_horizontal_pair(bottom_tag, top_tag, L, tol=1e-10):
     return error_x < tol
 
 def generate_XX_mesh(
-    filename="output/X_mesh.msh",
-    t=0.10,
-    mesh_size_matrix=0.02,
-    mesh_size_fiber=0.02,
+    t,
+    mesh_size_matrix,
+    mesh_size_fiber,
+    filename="output/X_mesh_cell.msh",
     num_refinements = 0
 ):
     """
@@ -853,7 +853,7 @@ def generate_periodic_X_mesh(
     mesh_size_matrix *= l_micro
     mesh_size_fiber *= l_micro
 
-    h = t
+    h = t/2
     sqrt2 = math.sqrt(2.0)
     R = 0.3 * t
 
