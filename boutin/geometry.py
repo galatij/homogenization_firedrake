@@ -318,7 +318,8 @@ def generate_XX_mesh(
     mesh_size_matrix,
     mesh_size_fiber,
     filename="output/X_mesh_cell.msh",
-    num_refinements = 0
+    num_refinements = 0,
+    diagnostics=False
 ):
     """
     Generate a periodic X-shaped fiber geometry in [0,1] x [0,1].
@@ -687,12 +688,12 @@ def generate_XX_mesh(
         key=lambda c: curve_midpoint(c)[0]
     )
 
-
-    print("\nPeriodic curves:")
-    print("  left  :", left_curves)
-    print("  right :", right_curves)
-    print("  bottom:", bottom_curves)
-    print("  top   :", top_curves)
+    if diagnostics==True:
+        print("\nPeriodic curves:")
+        print("  left  :", left_curves)
+        print("  right :", right_curves)
+        print("  bottom:", bottom_curves)
+        print("  top   :", top_curves)
 
 
     # ------------------------------------------------------------
@@ -811,6 +812,7 @@ def generate_periodic_X_mesh(
     mesh_size_matrix,
     mesh_size_fiber,
     num_refinements=0,
+    diagnostics=False
 ):
     """
     Generate an explicitly periodic X-microstructure.
@@ -1278,12 +1280,12 @@ def generate_periodic_X_mesh(
         key=lambda c: curve_midpoint(c)[0]
     )
 
-
-    print("\nFine-scale periodic curves:")
-    print("  left  :", left_curves)
-    print("  right :", right_curves)
-    print("  bottom:", bottom_curves)
-    print("  top   :", top_curves)
+    if diagnostics==True:
+        print("\nFine-scale periodic curves:")
+        print("  left  :", left_curves)
+        print("  right :", right_curves)
+        print("  bottom:", bottom_curves)
+        print("  top   :", top_curves)
 
 
     # ------------------------------------------------------------

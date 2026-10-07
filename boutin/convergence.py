@@ -140,7 +140,7 @@ def compare_solutions(U_fs, U_eff, U_RStrain, U_Lagrange, eps, Lx, Ly, Lz=None, 
     # )
 
     V_comp = VectorFunctionSpace(
-        mesh_comp, "CG", 1
+        mesh_comp, "CG", 2
     )
 
     # mesh_fs = U_fs.function_space().mesh()

@@ -251,7 +251,18 @@ class EffectiveProblemHo:
             "ksp_converged_reason": None,
             "pc_view": None,
         }
+        
+        # spm = {
+        #     "ksp_type": "gmres",
+        #     "ksp_rtol": 1e-8,
+        #     "ksp_atol": 1e-12,
+        #     "ksp_max_it": 5000,
 
+        #     "pc_type": "ilu",
+
+        #     "ksp_monitor": None,
+        #     "ksp_converged_reason": None,
+        # }
         self.solver = LinearSolver(
             A,
             nullspace=nullspc,

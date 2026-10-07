@@ -28,7 +28,7 @@ class CellProblem:
             if self.dim == 3:
                 self.mesh = PeriodicUnitCubeMesh(n, n, n, hexahedral=True)
             elif self.dim == 2:
-                self.mesh = PeriodicUnitSquareMesh(n, n, quadrilateral=True)
+                self.mesh = PeriodicUnitSquareMesh(8*n, 8*n, quadrilateral=True)
             else:
                 raise ValueError("dim must be 2 or 3")
 

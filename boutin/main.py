@@ -26,8 +26,8 @@ def main():
             "solve_eff": True,
             "solve_fs": True,
             "check_coeff": False,
-            "convergence_test": False,
-            "numerical_convergence_test": True,
+            "convergence_test": True,
+            "numerical_convergence_test": False,
             "is_per": True,
             "mirror_structure": False,
             "microstructure": "X",                       # "X" / "66" / "layered"
@@ -39,13 +39,13 @@ def main():
             "loadx": -5,
             "loady": -5,
             "loadz": -5,
-            "mu_dark": 1e10,
+            "mu_dark": 1e8,
             "mu_light": 1e6,
             "lmbda_dark": 0,
             "lmbda_light": 0
         },
         "geometry": {
-            "nref_cell": 16,                            # number of refinements
+            "nref_cell": 8,                            # number of refinements
             "chiral": {
                 "R": 7,   #5                              # radius
                 "t": 3.5,   # 2.5                            # thikness of the ligaments
@@ -58,10 +58,10 @@ def main():
                 "l_micro": 1                            # length of the domain
             },
             "fs_geom": {
-                "nx_macro": 16,                         # number of microdomains (cell) along x
-                "ny_macro": 16,                          # number of microdomains (cell) along y
+                "nx_macro": 2,                         # number of microdomains (cell) along x
+                "ny_macro": 2,                          # number of microdomains (cell) along y
                 "nz_macro": 1,                          # number of microdomains (cell) along z
-                "n_micro_fs": 2,                          # nref in a single microdomain (cell)
+                "n_micro_fs": 1,                          # nref in a single microdomain (cell)
                 "n_micro_eff": 8,
                 "Lx_macro": 8,                         # length of macroscopic domain along x
                 "Ly_macro": 8,                          # length of macroscopic domain along y
@@ -69,8 +69,8 @@ def main():
             }
         },
         "convergence": {
-            "nx_macro_values": [1, 2, 4, 8, 16],
-            "ny_macro_values": [1, 2, 4, 8, 16],
+            "nx_macro_values": [1, 2, 4, 8, 16, 32],
+            "ny_macro_values": [1, 2, 4, 8, 16, 32],
             "reference": "fine_scale",
             "numerical_refinements": 0,
             "current_level": 0
@@ -83,12 +83,12 @@ def main():
             solve_case
         )
     elif data["flags"]["convergence_test"]:
-        mu_dark_list = [1e7,1e8,1e9,1e10]
+        mu_dark_list = [1e6]#,1e7,1e8,1e9,1e10]
         for muuu in mu_dark_list:
                 
             data["coefficients"]["mu_dark"] = muuu
 
-            nx_values = homogenization_sequence(2,16)
+            nx_values = homogenization_sequence(2,4)
 
             conv = HomogenizationConvergenceTest(
                 data,

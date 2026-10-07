@@ -65,26 +65,26 @@ class FineScaleProblem:
                 filename = f"output/Xfs_mesh_level{current_level}.msh"
 
                 # If the file does not exist, generate it (and all the required nested refinemnets)
-                if not os.path.isfile(filename):
-                    generate_periodic_X_mesh(
-                        "output/Xfs_mesh.msh",
-                        nx, ny, l_micro,
-                        t,
-                        mesh_size_matrix=4*t/n_micro,
-                        mesh_size_fiber=t/n_micro,
-                        num_refinements = num_conv
-                    )
-                    check_gmsh_periodicity(filename)
-                    # Tell PETSc/DMPlex to read the $Periodic section
-                    # from the Gmsh file.
-                    opts = PETSc.Options()
-                    opts["dm_plex_gmsh_periodic"] = True
-                    opts["dm_plex_gmsh_use_regions"] = True
-                    opts["dm_plex_gmsh_use_generic"] = True
+                # if not os.path.isfile(filename):
+                generate_periodic_X_mesh(
+                    "output/Xfs_mesh.msh",
+                    nx, ny, l_micro,
+                    t,
+                    mesh_size_matrix=4*t/n_micro,
+                    mesh_size_fiber=t/n_micro,
+                    num_refinements = num_conv
+                )
+                # check_gmsh_periodicity(filename)
+                # Tell PETSc/DMPlex to read the $Periodic section
+                # from the Gmsh file.
+                opts = PETSc.Options()
+                opts["dm_plex_gmsh_periodic"] = True
+                opts["dm_plex_gmsh_use_regions"] = True
+                opts["dm_plex_gmsh_use_generic"] = True
 
                 self.mesh = Mesh(filename)
 
-                check_periodic_X_mesh(self.mesh)
+                # check_periodic_X_mesh(self.mesh)
 
         self._build_spaces()
         self._build_variational_problem()

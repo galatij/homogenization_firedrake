@@ -183,9 +183,9 @@ def run_fem_convergence(
     if solve_fs:
 
         print("\n")
-        print("=" * 100)
+        print("=" * 120)
         print("FINE-SCALE FEM CONVERGENCE")
-        print("=" * 100)
+        print("=" * 120)
 
         solutions_fs = []
         h_fs = []
@@ -312,9 +312,9 @@ def run_fem_convergence(
         # --------------------------------------------------------
 
         print("\n")
-        print("=" * 100)
+        print("=" * 120)
         print("FINE-SCALE FEM CONVERGENCE RESULTS")
-        print("=" * 100)
+        print("=" * 120)
 
         print(
             f"{'n_micro':>10}"
@@ -365,9 +365,9 @@ def run_fem_convergence(
     if solve_eff:
 
         print("\n")
-        print("=" * 100)
+        print("=" * 120)
         print("EFFECTIVE FEM CONVERGENCE")
-        print("=" * 100)
+        print("=" * 120)
 
         solutions_eff = []
         h_eff = []
@@ -486,9 +486,9 @@ def run_fem_convergence(
         # --------------------------------------------------------
 
         print("\n")
-        print("=" * 100)
+        print("=" * 120)
         print("EFFECTIVE FEM CONVERGENCE RESULTS")
-        print("=" * 100)
+        print("=" * 120)
 
         print(
             f"{'n_micro':>10}"
