@@ -37,16 +37,35 @@ class CellProblem:
                     "order must be 2 or 4"
                 )
         else:
-            t=data["geometry"]["crossed"]["t"]
             n_micro = data["geometry"]["fs_geom"]["n_micro_fs"]
-            generate_XX_mesh(
-                t,
-                mesh_size_matrix=4*t/n_micro,
-                mesh_size_fiber=t/n_micro,
-                filename="output/X_mesh_cell.msh"
-            )
+            if data["flags"]["microstructure"] == "X":
+                t=data["geometry"]["crossed"]["t"]
+                generate_X_mesh(
+                    t,
+                    mesh_size_matrix=4*t/n_micro,
+                    mesh_size_fiber=t/n_micro,
+                    filename="output/X_mesh_cell.msh"
+                )
 
-            check_gmsh_periodicity("output/X_mesh_cell.msh")
+                check_gmsh_periodicity("output/X_mesh_cell.msh")
+            elif data["flags"]["microstructure"] == "66":
+                l = data["geometry"]["chiral"]["l"]
+                R = data["geometry"]["chiral"]["R"]
+                t = data["geometry"]["chiral"]["t"]
+
+                generate_66_mesh(
+                    l, R, t,
+                    mesh_size_matrix=4*t/n_micro,
+                    mesh_size_fiber=t/n_micro,
+                    mesh_size_interface=0.1*t/n_micro,
+                    transition_width=t/n_micro,
+                    filename="output/66_mesh_cell.msh"
+                )
+
+                check_gmsh_periodicity("output/66_mesh_cell.msh")
+
+            else:
+                raise NotImplementedError("Only X and 66 microstructures currently supported")
 
             # Tell PETSc/DMPlex to read the $Periodic section
             # from the Gmsh file.
@@ -55,7 +74,10 @@ class CellProblem:
             opts["dm_plex_gmsh_use_regions"] = True
             opts["dm_plex_gmsh_use_generic"] = True
 
-            self.mesh = Mesh("output/X_mesh_cell.msh")
+            if data["flags"]["microstructure"] == "X":
+                self.mesh = Mesh("output/X_mesh_cell.msh")
+            elif data["flags"]["microstructure"] == "66":
+                self.mesh = Mesh("output/66_mesh_cell.msh")
 
             check_periodic_X_mesh(self.mesh)
         

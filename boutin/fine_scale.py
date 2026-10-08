@@ -1,5 +1,5 @@
 from firedrake import *
-from geometry import generate_periodic_X_mesh, check_gmsh_periodicity, check_periodic_X_mesh
+from geometry import generate_periodic_X_mesh, check_gmsh_periodicity, check_periodic_X_mesh, generate_periodic_66_mesh
 from ufl import as_tensor, as_matrix
 import numpy as np
 import os
@@ -58,22 +58,44 @@ class FineScaleProblem:
                 else:
                     raise ValueError("dim must be 2 or 3")
             else:
-                t=data["geometry"]["crossed"]["t"]
                 num_conv = data["convergence"]["numerical_refinements"]
                 current_level = data["convergence"]["current_level"]
-                # LOOK FOR THE FILE, OTHERWISE GENERATE
-                filename = f"output/Xfs_mesh_level{current_level}.msh"
 
-                # If the file does not exist, generate it (and all the required nested refinemnets)
-                # if not os.path.isfile(filename):
-                generate_periodic_X_mesh(
-                    "output/Xfs_mesh.msh",
-                    nx, ny, l_micro,
-                    t,
-                    mesh_size_matrix=4*t/n_micro,
-                    mesh_size_fiber=t/n_micro,
-                    num_refinements = num_conv
-                )
+                if data["flags"]["microstructure"] == "X":
+                    t=data["geometry"]["crossed"]["t"]
+                    # LOOK FOR THE FILE, OTHERWISE GENERATE
+                    filename = f"output/Xfs_mesh_level{current_level}.msh"
+                    
+                    # If the file does not exist, generate it (and all the required nested refinemnets)
+                    if not os.path.isfile(filename):
+                        generate_periodic_X_mesh(
+                            "output/Xfs_mesh.msh",
+                            nx, ny, l_micro,
+                            t,
+                            mesh_size_matrix=4*t/n_micro,
+                            mesh_size_fiber=t/n_micro,
+                            num_refinements = num_conv
+                        )
+                elif data["flags"]["microstructure"] == "66":
+                    l = data["geometry"]["chiral"]["l"]
+                    R = data["geometry"]["chiral"]["R"]
+                    t = data["geometry"]["chiral"]["t"]
+                    
+                    filename = f"output/66fs_mesh_level{current_level}.msh"
+
+                    if not os.path.isfile(filename):
+                        generate_periodic_66_mesh(
+                            "output/66fs_mesh.msh",
+                            nx, ny, l_micro,
+                            l, R, t,
+                            mesh_size_matrix=2*t/n_micro,
+                            mesh_size_fiber=t/n_micro,
+                            mesh_size_interface=t/n_micro,
+                            transition_width=t/n_micro,
+                            num_refinements = num_conv
+                        )
+
+
                 # check_gmsh_periodicity(filename)
                 # Tell PETSc/DMPlex to read the $Periodic section
                 # from the Gmsh file.
