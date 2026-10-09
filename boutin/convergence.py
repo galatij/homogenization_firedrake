@@ -455,12 +455,6 @@ class HomogenizationConvergenceTest:
 
             # ----------------------------------------------------
             # Solve the problem
-            #
-            # IMPORTANT:
-            #
-            # solve_case MUST solve a NEW fine-scale problem
-            # for this value of nx_macro / ny_macro.
-            #
             # ----------------------------------------------------
 
             U_fs, U_eff, U_RStrain, U_Lagrange = solve_case(data_test)

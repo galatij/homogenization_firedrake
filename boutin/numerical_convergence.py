@@ -260,7 +260,7 @@ def run_fem_convergence(
 
             err = solution_difference_errors(
                 solutions_fs[i],
-                solutions_fs[i+1],
+                solutions_fs[-1],#solutions_fs[i+1],
             )
 
             errors_L2.append(err["L2"])
@@ -438,7 +438,8 @@ def run_fem_convergence(
 
             err = solution_difference_errors(
                 solutions_eff[i],
-                solutions_eff[i+1],
+                # solutions_eff[i+1],
+                solutions_eff[-1],
             )
 
             errors_L2.append(err["L2"])

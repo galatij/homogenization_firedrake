@@ -12,11 +12,12 @@ import numpy as np
 
 
 # TODO: 
-# - compute error w.r.t. most refined mesh
-# - compute twoscale error wrt finest microstructure
-# - compute errors between finescale and effective (boutin) and effective (first order)
-# 
-# - understand how to properly compute L2, H1, average errors between solutions with different meshes
+#  - improve 66 mesh quality
+# OK compute error w.r.t. most refined mesh
+# OK compute twoscale error wrt finest microstructure (NOTE: nothing to do)
+#  - try H1 error with U_RS instead of grad(U_eff)
+#  - compute errors between finescale and effective (boutin) and effective (first order)
+#  - understand how to properly compute L2, H1, average errors between solutions with different meshes
 
 def main():
 
@@ -25,15 +26,15 @@ def main():
         "order": 4,                                     # order of the effective equation
         "output_dir": "output/cellpb",
         "flags": {
-            "solve_hom": True,
-            "solve_eff": True,
+            "solve_hom": False,
+            "solve_eff": False,
             "solve_fs": True,
             "check_coeff": False,
             "convergence_test": False,
-            "numerical_convergence_test": False,
+            "numerical_convergence_test": True,
             "is_per": True,
             "mirror_structure": False,
-            "microstructure": "66",                       # "X" / "66" / "layered"
+            "microstructure": "X",                       # "X" / "66" / "layered"
             "ho_type": "strain_gradient",                 # "strain_gradient" / "linear"
             "RSgrad_type": "I" ,
             "gmsh": True
@@ -61,10 +62,10 @@ def main():
                 "l_micro": 1                            # length of the domain
             },
             "fs_geom": {
-                "nx_macro": 8,                         # number of microdomains (cell) along x
-                "ny_macro": 8,                          # number of microdomains (cell) along y
+                "nx_macro": 2,                         # number of microdomains (cell) along x
+                "ny_macro": 2,                          # number of microdomains (cell) along y
                 "nz_macro": 1,                          # number of microdomains (cell) along z
-                "n_micro_fs": 16,                          # nref in a single microdomain (cell)
+                "n_micro_fs": 1,                          # nref in a single microdomain (cell)
                 "n_micro_eff": 1,
                 "Lx_macro": 8,                         # length of macroscopic domain along x
                 "Ly_macro": 8,                          # length of macroscopic domain along y
@@ -75,16 +76,19 @@ def main():
             "nx_macro_values": [1, 2, 4, 8, 16],
             "ny_macro_values": [1, 2, 4, 8, 16],
             "reference": "fine_scale",
-            "numerical_refinements": 0,
+            "numerical_refinements": 5,
             "current_level": 0
         }
     }
 
     if data["flags"]["numerical_convergence_test"]:
-        results = run_fem_convergence(
-            data,
-            solve_case
-        )
+        mu_dark_list = [1e7,1e8,1e9,1e10]
+        for muuu in mu_dark_list:
+            data["coefficients"]["mu_dark"] = muuu
+            results = run_fem_convergence(
+                data,
+                solve_case
+            )
     elif data["flags"]["convergence_test"]:
         mu_dark_list = [1e7,1e8,1e9,1e10]
         for muuu in mu_dark_list:
@@ -186,14 +190,17 @@ def solve_case(data):
     # Effective problem
     # ------------------------------------------------------------
     U_eff = None
-    if flags["solve_eff"]: 
+    U_RStrain = None
+    U_Lagrange = None
 
+    if flags["solve_eff"]: 
         print("\nSolving effective problem...")
         if flags["ho_type"] == "linear":
             eff_pb = EffectiveProblemLinear(data, Ceff, f_fun)
+            U_eff = eff_pb.solve()
         elif flags["ho_type"] == "strain_gradient":
             eff_pb = EffectiveProblemHo(data, Ceff, f_fun)
-        U_eff, U_RStrain, U_Lagrange = eff_pb.solve()
+            U_eff, U_RStrain, U_Lagrange = eff_pb.solve()
 
         print(" done.")
 
